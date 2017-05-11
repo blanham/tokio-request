@@ -57,7 +57,7 @@ pub struct Request {
     method: Method,
     params: Vec<(String, String)>,
     timeout: Option<Duration>,
-    url: Url
+    url: Url,
 }
 
 impl Request {
@@ -73,7 +73,7 @@ impl Request {
             method: method,
             params: Vec::new(),
             timeout: None,
-            url: url.clone()
+            url: url.clone(),
         }
     }
 
@@ -121,7 +121,7 @@ impl Request {
     /// ## Panics
     /// Panics if serialization is not successful.
     #[cfg(feature = "serde-serialization")]
-    pub fn json<T: serde::Serialize>(self, body: &T) -> Self {
+    pub fn json<T: serde::ser::Serialize>(self, body: &T) -> Self {
         self.set_json(serde_json::to_vec(body).unwrap())
     }
 
@@ -193,7 +193,8 @@ impl Request {
         let headers = {
             let mut list = List::new();
             for (key, value) in self.headers {
-                list.append(&format!("{}: {}", key.trim(), value.trim())).expect("Failed to append header value to (native cURL) header list.");
+                list.append(&format!("{}: {}", key.trim(), value.trim()))
+                    .expect("Failed to append header value to (native cURL) header list.");
             }
             list
         };
@@ -223,19 +224,22 @@ impl Request {
                 } else {
                     Ok(())
                 })
-                .and_then(|_| easy.header_function(move |header| {
-                    match str::from_utf8(header) {
-                        Ok(s) => {
-                            let s = s.trim(); // Headers are \n-separated
-                            if !first_header && s.len() > 0 { // First header is HTTP status line, don't want that
-                                let _ = header_tx.send(s.to_owned());
+                .and_then(|_| {
+                    easy.header_function(move |header| {
+                        match str::from_utf8(header) {
+                            Ok(s) => {
+                                let s = s.trim(); // Headers are \n-separated
+                                if !first_header && s.len() > 0 {
+                                    // First header is HTTP status line, don't want that
+                                    let _ = header_tx.send(s.to_owned());
+                                }
+                                first_header = false;
+                                true
                             }
-                            first_header = false;
-                            true
-                        },
-                        Err(_) => false
-                    }
-                }))
+                            Err(_) => false,
+                        }
+                    })
+                })
                 .and_then(|_| easy.http_headers(headers))
                 .and_then(|_| if let Some((bytes, per_time)) = lowspeed_limits {
                     easy.low_speed_limit(bytes)
@@ -259,37 +263,41 @@ impl Request {
                     Ok(())
                 })
                 .and_then(|_| easy.url(url.as_str()))
-                .and_then(|_| easy.write_function(move |data| {
-                    let _ = body_tx.send(Vec::from(data));
-                    Ok(data.len())
-                }))
+                .and_then(|_| {
+                    easy.write_function(move |data| {
+                        let _ = body_tx.send(Vec::from(data));
+                        Ok(data.len())
+                    })
+                })
         };
 
         match config_res {
-            Ok(_) => session.perform(easy)
-                            .map_err(|err| err.into_error())
-                            .map(move |ez| {
-                                // In an ideal world where receiver_try_iter is stable
-                                // we could shorten this code to two lines.
-                                let body = {
-                                    let mut b = Vec::new();
-                                    while let Ok(item) = body_rx.try_recv() {
-                                        b.extend(item);
-                                    }
-                                    b
-                                };
-                                let headers = {
-                                    let mut h = Vec::new();
-                                    while let Ok(hdr) = header_rx.try_recv() {
-                                        h.push(hdr);
-                                    }
-                                    h
-                                };
+            Ok(_) => {
+                session.perform(easy)
+                    .map_err(|err| err.into_error())
+                    .map(move |ez| {
+                        // In an ideal world where receiver_try_iter is stable
+                        // we could shorten this code to two lines.
+                        let body = {
+                            let mut b = Vec::new();
+                            while let Ok(item) = body_rx.try_recv() {
+                                b.extend(item);
+                            }
+                            b
+                        };
+                        let headers = {
+                            let mut h = Vec::new();
+                            while let Ok(hdr) = header_rx.try_recv() {
+                                h.push(hdr);
+                            }
+                            h
+                        };
 
-                                Response::new(ez, headers, body)
-                            })
-                            .boxed(),
-            Err(error) => failed(error.into()).boxed()
+                        Response::new(ez, headers, body)
+                    })
+                    .boxed()
+            }
+            Err(error) => failed(error.into()).boxed(),
         }
     }
 

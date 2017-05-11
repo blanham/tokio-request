@@ -23,7 +23,7 @@ pub struct Response {
     body: Vec<u8>,
     handle: Easy,
     headers: Vec<(String, String)>,
-    status_code: u16
+    status_code: u16,
 }
 
 impl Response {
@@ -32,13 +32,13 @@ impl Response {
     /// You usually don't create a response this way, but get one as result
     /// from `Request.send(...)`.
     pub fn new(mut easy: Easy, headers: Vec<String>, body: Vec<u8>) -> Response {
-        let headers =  {
+        let headers = {
             let mut vec = Vec::new();
             for header in headers {
                 let splitted: Vec<_> = header.splitn(2, ": ")
-                                             .map(|part| part.trim())
-                                             .filter(|part| part.len() > 0)
-                                             .collect();
+                    .map(|part| part.trim())
+                    .filter(|part| part.len() > 0)
+                    .collect();
                 if splitted.len() != 2 {
                     continue;
                 }
@@ -47,12 +47,13 @@ impl Response {
             }
             vec
         };
-        let status_code = easy.response_code().expect("Failed to get the response status code from cURL.") as u16;
+        let status_code =
+            easy.response_code().expect("Failed to get the response status code from cURL.") as u16;
         Response {
             body: body,
             handle: easy,
             headers: headers,
-            status_code: status_code
+            status_code: status_code,
         }
     }
 
@@ -100,9 +101,11 @@ impl Response {
     /// the first one. If you need to get access to the other values, use
     /// [`Response::headers()`](struct.Response.html#method.headers).
     pub fn header(&self, name: &str) -> Option<&String> {
-        self.headers.iter().filter(|kvp| kvp.0 == name)
-                           .nth(0)
-                           .map(|kvp| &kvp.1)
+        self.headers
+            .iter()
+            .filter(|kvp| kvp.0 == name)
+            .nth(0)
+            .map(|kvp| &kvp.1)
     }
 
     /// Gets all response headers.
@@ -115,7 +118,7 @@ impl Response {
     pub fn is_success(&self) -> bool {
         match self.status_code {
             200...299 => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -126,7 +129,8 @@ impl Response {
     /// be read as UTF-8 string or if it could not be deserialized from JSON.
     #[cfg(feature = "rustc-serialization")]
     pub fn json<T: rustc_serialize::Decodable>(&self) -> Result<T, Error> {
-        let string = try!(str::from_utf8(&self.body).map_err(|err| Error::new(ErrorKind::InvalidData, err)));
+        let string = try!(str::from_utf8(&self.body)
+            .map_err(|err| Error::new(ErrorKind::InvalidData, err)));
         rustc_serialize::json::decode(string).map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
@@ -136,7 +140,7 @@ impl Response {
     /// Returns `ErrorKind::InvalidData` when the server response could not
     /// be read as UTF-8 string or if it could not be deserialized from JSON.
     #[cfg(feature = "serde-serialization")]
-    pub fn json<T: serde::Deserialize>(&self) -> Result<T, Error> {
+    pub fn json<T: serde::de::DeserializeOwned>(&self) -> Result<T, Error> {
         serde_json::from_slice(self.body()).map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
@@ -147,8 +151,10 @@ impl Response {
     /// be read as UTF-8 string or if it could not be deserialized from JSON.
     #[cfg(feature = "rustc-serialization")]
     pub fn json_value(&self) -> Result<rustc_serialize::json::Json, Error> {
-        let string = try!(str::from_utf8(&self.body).map_err(|err| Error::new(ErrorKind::InvalidData, err)));
-        rustc_serialize::json::Json::from_str(string).map_err(|err| Error::new(ErrorKind::InvalidData, err))
+        let string = try!(str::from_utf8(&self.body)
+            .map_err(|err| Error::new(ErrorKind::InvalidData, err)));
+        rustc_serialize::json::Json::from_str(string)
+            .map_err(|err| Error::new(ErrorKind::InvalidData, err))
     }
 
     /// Attempts to decode the response body from JSON into an abstract
