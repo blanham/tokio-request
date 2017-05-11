@@ -10,15 +10,15 @@ keywords = ["http", "client", "request", "rest", "async", "asynchronous"]
 license = "MIT"
 
 [dependencies]
-curl = "0.4"
-futures = "0.1"
-mime = "0.2"
-rustc-serialize = { version = "0.3", optional = true }
-serde = { version = "0.8", optional = true }
-serde_json = { version = "0.8", optional = true }
-tokio-core = "0.1"
-tokio-curl = "0.1"
-url = "1.2"
+curl = "0.4.6"
+futures = "0.1.13"
+mime = "0.2.3"
+rustc-serialize = { version = "0.3.24", optional = true }
+serde = { version = "1.0.4", optional = true }
+serde_json = { version = "1.0.2", optional = true }
+tokio-core = "0.1.7"
+tokio-curl = "0.1.9"
+url = "1.4.0"
 
 [features]
 default = ["serde-serialization"]
