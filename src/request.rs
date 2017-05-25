@@ -58,6 +58,8 @@ pub struct Request {
     params: Vec<(String, String)>,
     timeout: Option<Duration>,
     url: Url,
+    username: Option<String>,
+    password: Option<String>
 }
 
 impl Request {
@@ -74,6 +76,8 @@ impl Request {
             params: Vec::new(),
             timeout: None,
             url: url.clone(),
+            username: None,
+            password: None
         }
     }
 
@@ -102,6 +106,22 @@ impl Request {
     /// This overwrites all previously set headers.
     pub fn headers(mut self, headers: Vec<(String, String)>) -> Self {
         self.headers = headers;
+        self
+    }
+
+    /// Sets the username for basic auth
+    ///
+    /// Defaults to None
+    pub fn username(mut self, username: String) -> Self {
+        self.username = Some(username);
+        self
+    }
+
+    /// Sets the password for basic auth
+    ///
+    /// Defaults to None
+    pub fn password(mut self, password: String) -> Self {
+        self.password = Some(password);
         self
     }
 
@@ -212,6 +232,8 @@ impl Request {
             let method = self.method;
             let timeout = self.timeout;
             let url = self.url;
+            let username = self.username;
+            let password = self.password;
             let mut first_header = true;
 
             // We cannot use try! here, since we're dealing with futures, not with Results
@@ -239,6 +261,16 @@ impl Request {
                             Err(_) => false,
                         }
                     })
+                })
+                .and_then(|_| if let Some(ref username) = username {
+                    easy.username(username.as_str())
+                } else {
+                    Ok(())
+                })
+                .and_then(|_| if let Some(ref password) = password {
+                    easy.password(password.as_str())
+                } else {
+                    Ok(())
                 })
                 .and_then(|_| easy.http_headers(headers))
                 .and_then(|_| if let Some((bytes, per_time)) = lowspeed_limits {
