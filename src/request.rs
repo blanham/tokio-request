@@ -81,6 +81,12 @@ impl Request {
         }
     }
 
+    /// Resets the URL
+    pub fn url(mut self, url: Url) -> Self {
+        self.url = url.clone();
+        self
+    }
+
     /// Sets the body of the request as raw byte array.
     pub fn body<B: Into<Vec<u8>>>(mut self, body: B) -> Self {
         self.body = Some(body.into());
